@@ -31,6 +31,8 @@
 static const uint32_t vdrm_formats[] = {
 	DRM_FORMAT_XRGB8888,
 	DRM_FORMAT_ARGB8888,
+	DRM_FORMAT_ABGR8888,
+	DRM_FORMAT_XBGR8888,
 };
 
 struct vdrm_backend {
@@ -215,7 +217,13 @@ vdrm_handle_touch(struct vdrm_backend *b, const struct InputEvent *ev)
 	weston_touch_event_init(&touch, &ts, &b->seat, b->touch_device,
 				type, ev->touch.pointer_id, &pos);
 	notify_touch_normalized(&touch, NULL);
-	notify_touch_frame(b->touch_device);
+}
+
+static void
+vdrm_handle_touch_frame(struct vdrm_backend *b)
+{
+	if (b->touch_device)
+		notify_touch_frame(b->touch_device);
 }
 
 static void
@@ -236,6 +244,9 @@ vdrm_process_input_event(struct vdrm_backend *b, const struct InputEvent *ev)
 		break;
 	case INPUT_TYPE_TOUCH:
 		vdrm_handle_touch(b, ev);
+		break;
+	case INPUT_TYPE_TOUCH_FRAME:
+		vdrm_handle_touch_frame(b);
 		break;
 	}
 }
@@ -342,8 +353,8 @@ static uint32_t
 protocol_format_to_drm(uint32_t fmt)
 {
 	switch (fmt) {
-	case 1: /* PIXEL_FORMAT_RGBA_8888 */
-		return DRM_FORMAT_XRGB8888;
+	case 1: /* PIXEL_FORMAT_RGBA_8888 (Android R8G8B8A8 memory layout) */
+		return DRM_FORMAT_ABGR8888;
 	default:
 		return DRM_FORMAT_XRGB8888;
 	}

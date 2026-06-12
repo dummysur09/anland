@@ -5,13 +5,11 @@ import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.InputDevice;
-import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.PointerIcon;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
@@ -19,7 +17,6 @@ import android.view.WindowManager;
 
 public class MainActivity extends Activity implements SurfaceHolder.Callback {
     private static final String TAG = "VirtualDRM";
-    private static final String DAEMON_SOCK = "/data/local/tmp/display_daemon.sock";
 
     private SurfaceView surfaceView;
     private boolean surfaceReady = false;
@@ -31,6 +28,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     private native void nativeStart(Surface surface);
     private native void nativeStop();
     private native void nativeSendTouch(int action, float x, float y, int pointerId);
+    private native void nativeSendTouchFrame();
     private native void nativeSendMouseMotion(float x, float y);
     private native void nativeSendMouseButton(int button, boolean pressed);
     private native void nativeSendMouseScroll(int axis, float value);
@@ -49,6 +47,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
 
         setupFullscreen();
         setupCursorHiding();
+        enterLockTask();
     }
 
     private void setupFullscreen() {
@@ -62,6 +61,14 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
             WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
     }
 
+    private void enterLockTask() {
+        try {
+            startLockTask();
+        } catch (Exception e) {
+            Log.w(TAG, "lockTask failed", e);
+        }
+    }
+
     private void setupCursorHiding() {
         surfaceView.setPointerIcon(PointerIcon.getSystemIcon(this, PointerIcon.TYPE_NULL));
     }
@@ -70,7 +77,6 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     protected void onResume() {
         super.onResume();
         setupFullscreen();
-        grantSocketAccess();
         if (surfaceReady) {
             nativeStop();
             nativeStart(surfaceView.getHolder().getSurface());
@@ -99,16 +105,6 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
     public void surfaceDestroyed(SurfaceHolder holder) {
         surfaceReady = false;
         nativeStop();
-    }
-
-    private void grantSocketAccess() {
-        try {
-            Process p = Runtime.getRuntime().exec(
-                new String[]{"su", "-c", "chmod 777 " + DAEMON_SOCK});
-            p.waitFor();
-        } catch (Exception e) {
-            Log.e(TAG, "failed to grant socket access", e);
-        }
     }
 
     @Override
@@ -173,20 +169,24 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback {
             case MotionEvent.ACTION_DOWN:
             case MotionEvent.ACTION_POINTER_DOWN:
                 nativeSendTouch(0, event.getX(pointerIdx), event.getY(pointerIdx), pointerId);
+                nativeSendTouchFrame();
                 return true;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_POINTER_UP:
                 nativeSendTouch(1, event.getX(pointerIdx), event.getY(pointerIdx), pointerId);
+                nativeSendTouchFrame();
                 return true;
             case MotionEvent.ACTION_MOVE:
                 for (int i = 0; i < event.getPointerCount(); i++) {
                     nativeSendTouch(2, event.getX(i), event.getY(i), event.getPointerId(i));
                 }
+                nativeSendTouchFrame();
                 return true;
             case MotionEvent.ACTION_CANCEL:
                 for (int i = 0; i < event.getPointerCount(); i++) {
                     nativeSendTouch(1, event.getX(i), event.getY(i), event.getPointerId(i));
                 }
+                nativeSendTouchFrame();
                 return true;
         }
         return false;

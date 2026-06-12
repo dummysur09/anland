@@ -48,6 +48,7 @@ struct buf_info {
 #define INPUT_TYPE_POINTER_MOTION 3
 #define INPUT_TYPE_POINTER_BUTTON 4
 #define INPUT_TYPE_POINTER_AXIS   5
+#define INPUT_TYPE_TOUCH_FRAME    6
 
 #define INPUT_ACTION_DOWN    0
 #define INPUT_ACTION_UP      1
