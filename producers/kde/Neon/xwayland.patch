@@ -1,0 +1,66 @@
+--- a/hw/xwayland/xwayland-glamor-gbm.c
++++ b/hw/xwayland/xwayland-glamor-gbm.c
+@@ -590,8 +590,17 @@
+             return NULL;
+     }
+ 
++    /* An implicit-modifier buffer (DRM_FORMAT_MOD_INVALID) is never listed in
++     * the compositor's advertised modifier set, so the regular support check
++     * fails. On the kgsl/turnip stack — where the buffer is allocated on the
++     * display node but composited by turnip — that left both the dmabuf and
++     * the (absent) wl_drm path unusable, so no wl_buffer was created and the
++     * X11 window stayed black. Per the linux-dmabuf protocol, INVALID means
++     * "let the compositor infer the layout", so submit it through the dmabuf
++     * path directly instead of rejecting it. */
+     if (xwl_screen->dmabuf &&
+-        xwl_glamor_is_modifier_supported(xwl_screen, format, modifier)) {
++        (modifier == DRM_FORMAT_MOD_INVALID ||
++         xwl_glamor_is_modifier_supported(xwl_screen, format, modifier))) {
+         struct zwp_linux_buffer_params_v1 *params;
+ 
+         params = zwp_linux_dmabuf_v1_create_params(xwl_screen->dmabuf);
+@@ -773,6 +782,15 @@
+         strides[0] < width * bpp / 8)
+         goto error;
+ 
++    /* Some freedreno/kgsl mesa builds (the on-device dev tree) rewrite a
++     * LINEAR modifier (0) to a bogus 1274 (0x4FA) in the loader_dri3
++     * pixmap_from_buffers path. 1274 is not a valid DRM modifier, so the
++     * gbm_bo_import() below rejects it and the X11 GL client gets BadAlloc
++     * (dri3_alloc_render_buffer -> pixmap_from_buffer[s] failed -> segfault).
++     * The buffer is really linear, so map the bogus value back to LINEAR. */
++    if (modifier == 1274ULL)
++        modifier = DRM_FORMAT_MOD_LINEAR;
++
+     if (xwl_gbm->dmabuf_capable && modifier != DRM_FORMAT_MOD_INVALID) {
+ #ifdef GBM_BO_WITH_MODIFIERS
+         struct gbm_import_fd_modifier_data data;
+@@ -1665,27 +1683,37 @@
+ xwl_glamor_gbm_init_main_dev(struct xwl_screen *xwl_screen)
+ {
+     struct xwl_gbm_private *xwl_gbm = xwl_glamor_gbm_get_private(xwl_screen);
+-    struct stat drm_stat;
++    struct stat drm_stat = {};
+     int main_dev_fd;
+ 
+-    if (!xwl_screen->drm_interface) {
+-        xwl_gbm->main_dev = xwl_gbm->fd_render_dev;
+-        return TRUE;
+-    }
++    /* On the kgsl/Qualcomm stack there is no DRM interface advertised by the
++     * Wayland compositor, so xwl_screen->drm_interface is NULL.  The old code
++     * fell through to gbm_bo_get_device() which returned NULL for kgsl fds,
++     * leaving main_dev unset (NULL) and causing a NULL-deref later in
++     * xwl_glamor_gbm_init_wl_registry when trying to create the gbm device.
++     * Fall back to the render device when no DRM interface is present. */
++    if (!xwl_screen->drm_interface) {
++        xwl_gbm->main_dev = xwl_gbm->fd_render_dev;
++        return xwl_gbm->main_dev != NULL;
++    }
+ 
+     main_dev_fd = open(xwl_screen->drm_interface->drm_path, O_RDWR | O_CLOEXEC);
+     if (main_dev_fd < 0) {
+         xwl_gbm->main_dev = xwl_gbm->fd_render_dev;
+-        return TRUE;
++        return xwl_gbm->main_dev != NULL;
+     }
