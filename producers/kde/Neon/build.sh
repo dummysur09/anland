@@ -1,0 +1,183 @@
+#!/bin/bash
+#
+# build.sh — KDE neon (Ubuntu noble/24.04 LTS base) anland KWin + Xwayland build
+#
+# Adapted from:
+#   - ubuntu2604_v5/build.sh  → .deb build system (apt source / dpkg-buildpackage)
+#   - Fedora43_v5/kwin.patch  → patch targeting KWin 6.7.x (closest to neon 6.7.3)
+#
+# Run this INSIDE a KDE neon container (Droidspaces or chroot).
+# Uses sudo for privileged steps; works as root or a user with sudo rights.
+#
+# What the patches fix on the kgsl/turnip (Snapdragon) stack:
+#   kwin.patch      → Anland backend + Android keyboard commitText() bridge
+#   xwayland.patch  → kgsl GBM NULL main_dev fallback + implicit-modifier wl_buffer fix
+#
+# The official package version from debian/changelog is kept untouched so the
+# resulting .deb reinstalls cleanly over the neon package without confusing apt.
+#
+set -u
+
+# ---- sudo helper -----------------------------------------------------------
+if [ "$(id -u)" -eq 0 ]; then
+    SUDO=""
+else
+    SUDO="sudo"
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKDIR="${WORKDIR:-$HOME/anland-kdneon-build}"
+JOBS="$(nproc)"
+
+# ---- helpers ---------------------------------------------------------------
+find_patch() {
+    local name="$1" explicit="${2:-}"
+    if [ -n "$explicit" ] && [ -f "$explicit" ]; then
+        printf '%s\n' "$explicit"; return 0
+    fi
+    local c
+    for c in "$SCRIPT_DIR/$name" "./$name" "$SCRIPT_DIR/../$name"; do
+        if [ -f "$c" ]; then printf '%s\n' "$c"; return 0; fi
+    done
+    local hit
+    hit="$(find "$SCRIPT_DIR" "$PWD" -maxdepth 3 -name "$name" -type f 2>/dev/null | head -1)"
+    if [ -n "$hit" ]; then printf '%s\n' "$hit"; return 0; fi
+    return 1
+}
+
+log()  { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
+warn() { printf '\033[1;33m[warn] %s\033[0m\n' "$*"; }
+die()  { printf '\033[1;31m[error] %s\033[0m\n' "$*" >&2; exit 1; }
+
+# ---- enable deb-src so `apt source` works ----------------------------------
+ensure_deb_src() {
+    # KDE neon uses /etc/apt/sources.list.d/neon.list (noble base)
+    if ! $SUDO grep -rqsE '^Types:.*deb-src|^deb-src ' \
+            /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null; then
+        log "Enabling deb-src repositories for KDE neon (noble base)"
+        # Modern Ubuntu-style .sources file
+        if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+            $SUDO sed -i 's/^Types: deb$/Types: deb deb-src/' \
+                /etc/apt/sources.list.d/ubuntu.sources
+        fi
+        # KDE neon specific source list
+        if [ -f /etc/apt/sources.list.d/neon.list ]; then
+            local neon_src
+            neon_src="$(grep '^deb ' /etc/apt/sources.list.d/neon.list | \
+                         sed 's/^deb /deb-src /' | head -1)"
+            if [ -n "$neon_src" ]; then
+                echo "$neon_src" | $SUDO tee -a /etc/apt/sources.list.d/neon.list >/dev/null
+            fi
+        fi
+        # Legacy single-line format fallback
+        if [ -f /etc/apt/sources.list ]; then
+            $SUDO sed -i '/^deb /{ h; s/^deb /deb-src /; H; g }' \
+                /etc/apt/sources.list
+        fi
+        $SUDO apt-get update -qq
+    fi
+}
+
+# ---- pin built packages so apt upgrade won't overwrite them ----------------
+apt_hold_pkg() {
+    local pkg="$1"
+    echo "${pkg} hold" | $SUDO dpkg --set-selections
+}
+
+# ---- build a single source package, apply patch, produce .deb --------------
+build_pkg_deb() {
+    local src="$1" patch="$2"
+
+    log "Installing build tools"
+    $SUDO apt-get install -y --no-install-recommends \
+        build-essential devscripts equivs dpkg-dev patch curl wget \
+        2>/dev/null
+
+    log "Fetching source for '${src}'"
+    rm -rf "${WORKDIR:?}/${src}"
+    mkdir -p "$WORKDIR/$src"
+    cd "$WORKDIR/$src"
+
+    # Install build-deps (pulls Qt6, KF6, etc.)
+    $SUDO apt-get build-dep -y "$src" 2>/dev/null || \
+        warn "build-dep had warnings — continuing"
+
+    # Download the source
+    apt-get source "$src" 2>/dev/null || \
+        die "apt-get source failed for '${src}'. Check that deb-src is enabled."
+
+    # Enter the unpacked source tree
+    local srcdir
+    srcdir="$(find . -maxdepth 1 -mindepth 1 -type d | head -1)"
+    [ -d "$srcdir" ] || die "Could not find unpacked source directory for '${src}'"
+    cd "$srcdir"
+
+    log "Applying patch: ${patch}"
+    patch -p1 < "$patch" || die "Patch failed to apply cleanly. May need manual adjustment for this KWin version."
+
+    log "Building .deb packages (using ${JOBS} jobs)"
+    DEB_BUILD_OPTIONS="nocheck parallel=${JOBS}" \
+        dpkg-buildpackage -b -us -uc -j"$JOBS" \
+        || die "dpkg-buildpackage failed for '${src}'"
+
+    log "Collecting .deb files"
+    find "$WORKDIR/$src" -maxdepth 1 -name "*.deb" | while read -r deb; do
+        cp "$deb" "$WORKDIR/"
+        log "  → $(basename "$deb")"
+    done
+}
+
+# ---- main ------------------------------------------------------------------
+main() {
+    log "=== KDE neon Anland KWin + Xwayland build ==="
+    log "Workdir: $WORKDIR"
+    mkdir -p "$WORKDIR"
+
+    # Locate patch files
+    local kwin_patch xwayland_patch
+    kwin_patch="$(find_patch kwin.patch "${KWIN_PATCH:-}")" \
+        || die "kwin.patch not found. Place it next to this script or set KWIN_PATCH=..."
+    xwayland_patch="$(find_patch xwayland.patch "${XWAYLAND_PATCH:-}")" \
+        || die "xwayland.patch not found. Place it next to this script or set XWAYLAND_PATCH=..."
+
+    log "kwin.patch     → $kwin_patch"
+    log "xwayland.patch → $xwayland_patch"
+
+    ensure_deb_src
+
+    # ---- Step 1: build patched KWin ----------------------------------------
+    log "--- Building patched kwin ---"
+    build_pkg_deb "kwin" "$kwin_patch"
+
+    # Hold kwin packages so neon's auto-updater won't overwrite them
+    for pkg in kwin-common kwin-wayland kwin-x11 libkwin6 kwin-data; do
+        apt_hold_pkg "$pkg" 2>/dev/null || true
+    done
+
+    # ---- Step 2: build patched Xwayland ------------------------------------
+    log "--- Building patched xwayland ---"
+    build_pkg_deb "xwayland" "$xwayland_patch"
+    apt_hold_pkg "xwayland" 2>/dev/null || true
+
+    # ---- Step 3: install all built .debs -----------------------------------
+    log "--- Installing built packages ---"
+    local debs
+    debs="$(find "$WORKDIR" -maxdepth 1 -name "*.deb" | tr '\n' ' ')"
+    if [ -z "$debs" ]; then
+        die "No .deb files found in $WORKDIR — build may have failed."
+    fi
+    # shellcheck disable=SC2086
+    $SUDO dpkg -i $debs || $SUDO apt-get install -f -y
+
+    log ""
+    log "✅ Done! Patched KWin + Xwayland installed on KDE neon."
+    log "   Built .deb files are in: $WORKDIR"
+    log ""
+    log "   Restart your KDE session to load the Anland backend:"
+    log "   kwin_wayland --backend anland --xwayland"
+    log ""
+    log "   Packages are held (pinned). To unhold later:"
+    log "   sudo apt-mark unhold kwin-common kwin-wayland kwin-x11 libkwin6 kwin-data xwayland"
+}
+
+main "$@"
