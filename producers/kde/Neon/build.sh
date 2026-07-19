@@ -127,7 +127,14 @@ build_pkg_deb() {
         libxcb-shape0-dev libxcb-xfixes0-dev libxcb-damage0-dev libxcb-sync-dev \
         libxcb-render0-dev libxcb-shm0-dev libxcb-glx0-dev libxcb-present-dev \
         libxcb-xinput-dev libxcb-xkb-dev libxkbcommon-dev libxkbcommon-x11-dev \
-        libxcb1-dev libx11-dev hwdata libqaccessibilityclient-qt6-dev || true
+        libxcb1-dev libx11-dev hwdata libqaccessibilityclient-qt6-dev \
+        gettext knighttime-dev kwayland-dev libcap2-bin libegl-dev \
+        libfontconfig-dev libfreetype-dev libkirigami-dev libplasmaactivities-dev \
+        libsystemd-dev libxcursor-dev libxi-dev pkgconf plasma-wayland-protocols \
+        qt6-5compat-dev qt6-base-private-dev qt6-declarative-private-dev \
+        qt6-sensors-dev qt6-svg-dev qt6-tools-dev qt6-wayland-private-dev \
+        wayland-protocols xwayland libxcb-cursor-dev libxcb-image0-dev \
+        libxcb-util-dev libxcb-xtest0-dev || true
 
     # Download the source
     log "Downloading source code for '${src}'"
