@@ -105,10 +105,11 @@ build_pkg_deb() {
     mkdir -p "$WORKDIR/$src"
     cd "$WORKDIR/$src"
 
-    # Pre-install conflicting/unmet packages to align versions for Neon, and run apt-get build-dep with resolver options
+    # Purge conflicting theme packages first so that apt-get build-dep does not hit unmet version dependency checks
     if [ "$src" = "kwin" ]; then
-        log "Pre-installing breeze packages to prevent conflicts"
-        $SUDO apt-get install -y --no-install-recommends breeze breeze-cursor-theme >/dev/null 2>&1 || true
+        log "Purging conflicting breeze packages to resolve build-dep conflicts"
+        $SUDO apt-get purge -y breeze breeze-cursor-theme kwin-style-breeze kde-style-breeze >/dev/null 2>&1 || true
+        $SUDO apt-get autoremove -y >/dev/null 2>&1 || true
     fi
 
     # Install build-deps (pulls Qt6, KF6, etc.)
