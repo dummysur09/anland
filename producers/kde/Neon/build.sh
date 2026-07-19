@@ -135,7 +135,7 @@ build_pkg_deb() {
         qt6-sensors-dev qt6-svg-dev qt6-tools-dev qt6-wayland-private-dev \
         wayland-protocols xwayland libxcb-cursor-dev libxcb-image0-dev \
         libxcb-util-dev libxcb-xtest0-dev pkg-kde-tools libplasma-dev \
-        libkglobalacceld-dev || true
+        kglobalacceld-dev || true
 
     # Download the source
     log "Downloading source code for '${src}'"
