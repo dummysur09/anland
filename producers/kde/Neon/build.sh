@@ -111,17 +111,11 @@ build_pkg_deb() {
         libwayland-dev libdrm-dev libgbm-dev libinput-dev \
         libxkbcommon-dev libudev-dev libepoxy-dev || true
 
-    # Install remaining build-deps (pulls Qt6, KF6, etc.) while explicitly excluding conflicting breeze theme dependencies
-    log "Installing build dependencies for '${src}' (excluding breeze-dev)"
-    if [ "$src" = "kwin" ]; then
-        $SUDO apt-get build-dep -y --no-install-recommends "$src" breeze-dev- breeze-cursor-theme- || \
-        $SUDO apt-get build-dep -y "$src" breeze-dev- breeze-cursor-theme- || \
-            warn "build-dep had warnings — continuing"
-    else
-        $SUDO apt-get build-dep -y --no-install-recommends "$src" || \
-        $SUDO apt-get build-dep -y "$src" || \
-            warn "build-dep had warnings — continuing"
-    fi
+    # Install remaining build-deps (pulls Qt6, KF6, etc.)
+    log "Installing build dependencies for '${src}'"
+    $SUDO apt-get build-dep -y --no-install-recommends "$src" || \
+    $SUDO apt-get build-dep -y "$src" || \
+        warn "build-dep had warnings — continuing"
 
     # Download the source
     log "Downloading source code for '${src}'"
