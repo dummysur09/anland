@@ -35,48 +35,6 @@
      if (xwl_gbm->dmabuf_capable && modifier != DRM_FORMAT_MOD_INVALID) {
  #ifdef GBM_BO_WITH_MODIFIERS
          struct gbm_import_fd_modifier_data data;
-@@ -1665,30 +1683,36 @@
- xwl_glamor_gbm_init_main_dev(struct xwl_screen *xwl_screen)
- {
-     struct xwl_gbm_private *xwl_gbm = xwl_glamor_gbm_get_private(xwl_screen);
--    struct stat drm_stat;
-+    struct stat drm_stat = {};
-     int main_dev_fd;
- 
--    if (!xwl_screen->drm_interface) {
--        xwl_gbm->main_dev = xwl_gbm->fd_render_dev;
--        return TRUE;
--    }
-+    /* On the kgsl/Qualcomm stack there is no DRM interface advertised by the
-+     * Wayland compositor, so xwl_screen->drm_interface is NULL.  The old code
-+     * fell through to gbm_bo_get_device() which returned NULL for kgsl fds,
-+     * leaving main_dev unset (NULL) and causing a NULL-deref later in
-+     * xwl_glamor_gbm_init_wl_registry when trying to create the gbm device.
-+     * Fall back to the render device when no DRM interface is present. */
-+    if (!xwl_screen->drm_interface) {
-+        xwl_gbm->main_dev = xwl_gbm->fd_render_dev;
-+        return xwl_gbm->main_dev != NULL;
-+    }
- 
-     main_dev_fd = open(xwl_screen->drm_interface->drm_path, O_RDWR | O_CLOEXEC);
-     if (main_dev_fd < 0) {
-         xwl_gbm->main_dev = xwl_gbm->fd_render_dev;
--        return TRUE;
-+        return xwl_gbm->main_dev != NULL;
-     }
- 
-     if (fstat(main_dev_fd, &drm_stat) < 0) {
-         close(main_dev_fd);
-         return FALSE;
-     }
- 
-     xwl_gbm->main_dev = gbm_create_device(main_dev_fd);
-     if (!xwl_gbm->main_dev) {
-         close(main_dev_fd);
-         return FALSE;
-     }
- 
-     return TRUE;
- }
+
 
 
