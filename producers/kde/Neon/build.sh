@@ -51,14 +51,7 @@ die()  { printf '\033[1;31m[error] %s\033[0m\n' "$*" >&2; exit 1; }
 
 # ---- enable deb-src so `apt source` works ----------------------------------
 ensure_deb_src() {
-    # Forcefully purge conflicting theme packages using dpkg directly to bypass apt resolver conflicts
-    log "Purging conflicting packages from base Ubuntu image using dpkg"
-    for pkg in breeze breeze-cursor-theme kwin-style-breeze kde-style-breeze; do
-        $SUDO dpkg --purge --force-all "$pkg" >/dev/null 2>&1 || true
-    done
-    $SUDO apt-get autoremove -y >/dev/null 2>&1 || true
-
-    # Ensure ca-certificates, gnupg and wget are installed first
+    # Ensure base directories exist and configure Neon repositories
     $SUDO apt-get update -qq
     $SUDO apt-get install -y --no-install-recommends ca-certificates gnupg wget >/dev/null 2>&1
 
@@ -85,11 +78,7 @@ ensure_deb_src() {
         $SUDO sed -i '/^deb /{ h; s/^deb /deb-src /; H; g }' /etc/apt/sources.list
     fi
 
-    # Run dist-upgrade to align versions and solve dependencies conflicts
-    log "Running dist-upgrade to align packaging versions"
     $SUDO apt-get update -qq
-    $SUDO apt-get dist-upgrade -y -o Dpkg::Options::="--force-overwrite" --allow-downgrades
-    $SUDO apt-get install -f -y
 }
 
 # ---- pin built packages so apt upgrade won't overwrite them ----------------
