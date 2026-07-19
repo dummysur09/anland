@@ -94,6 +94,7 @@ build_pkg_deb() {
     log "Installing build tools"
     $SUDO apt-get install -y --no-install-recommends \
         build-essential devscripts equivs dpkg-dev patch curl wget \
+        meson ninja-build \
         2>/dev/null
 
     log "Fetching source for '${src}'"
