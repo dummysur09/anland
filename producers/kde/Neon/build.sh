@@ -101,11 +101,20 @@ build_pkg_deb() {
     mkdir -p "$WORKDIR/$src"
     cd "$WORKDIR/$src"
 
+    # Pre-install conflicting/unmet packages to align versions for Neon, and run apt-get build-dep with resolver options
+    if [ "$src" = "kwin" ]; then
+        log "Pre-installing breeze packages to prevent conflicts"
+        $SUDO apt-get install -y --no-install-recommends breeze breeze-cursor-theme >/dev/null 2>&1 || true
+    fi
+
     # Install build-deps (pulls Qt6, KF6, etc.)
-    $SUDO apt-get build-dep -y "$src" 2>/dev/null || \
+    log "Installing build dependencies for '${src}'"
+    $SUDO apt-get build-dep -y -o Debug::pkgProblemResolver=yes --no-install-recommends "$src" || \
+    $SUDO apt-get build-dep -y "$src" || \
         warn "build-dep had warnings — continuing"
 
     # Download the source
+    log "Downloading source code for '${src}'"
     apt-get source "$src" 2>/dev/null || \
         die "apt-get source failed for '${src}'. Check that deb-src is enabled."
 
