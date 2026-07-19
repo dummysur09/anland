@@ -255,37 +255,27 @@ DrmDevice *AnlandEglBackend::drmDevice() const
 
 bool AnlandEglBackend::initializeEgl()
 {
-    initClientExtensions();
-
-    if (!m_backend->sceneEglDisplayObject()) {
-        if (!hasClientExtension(QByteArrayLiteral("EGL_MESA_platform_surfaceless"))) {
-            qCWarning(KWIN_ANLAND) << "Extension EGL_MESA_platform_surfaceless not available";
-            return false;
-        }
-        m_backend->setEglDisplay(EglDisplay::create(eglGetPlatformDisplayEXT(EGL_PLATFORM_SURFACELESS_MESA, EGL_DEFAULT_DISPLAY, nullptr)));
-    }
-
-    auto display = m_backend->sceneEglDisplayObject();
-    if (!display) {
+    if (!initClientExtensions()) {
         return false;
     }
-    setEglDisplay(display);
+    Q_ASSERT(m_backend->renderDevice());
+    setRenderDevice(m_backend->renderDevice());
     return true;
 }
 
 bool AnlandEglBackend::init()
 {
     if (!initializeEgl()) {
-        setFailed("Could not initialize egl");
+        qCWarning(KWIN_ANLAND) << "Could not initialize egl";
         return false;
     }
     if (!initRenderingContext()) {
-        setFailed("Could not initialize rendering context");
+        qCWarning(KWIN_ANLAND) << "Could not initialize rendering context";
         return false;
     }
 
     if (checkGLError("Init")) {
-        setFailed("Error during init of AnlandEglBackend");
+        qCWarning(KWIN_ANLAND) << "Error during init of AnlandEglBackend";
         return false;
     }
 
@@ -303,7 +293,7 @@ bool AnlandEglBackend::init()
 
 bool AnlandEglBackend::initRenderingContext()
 {
-    return createContext(EGL_NO_CONFIG_KHR) && openglContext()->makeCurrent();
+    return createContext() && openglContext()->makeCurrent();
 }
 
 void AnlandEglBackend::addOutput(BackendOutput *output)

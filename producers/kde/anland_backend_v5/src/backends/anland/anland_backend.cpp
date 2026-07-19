@@ -13,6 +13,7 @@
 #include "anland_output.h"
 
 #include "core/drmdevice.h"
+#include "core/renderdevice.h"
 #include "core/renderloop.h"
 #include "inputmethod.h"
 #include "main.h"
@@ -44,18 +45,16 @@ static const QString s_defaultSocketPath = QStringLiteral("/tmp/display_daemon.s
 static const int s_reconnectIntervalMs = 200;
 
 /*
- * KWin needs a DRM render device for the GL/EGL path (syncobj timelines, dmabuf
- * feedback). The anland backend renders surfaceless and imports the daemon's
- * dmabufs, so any usable render node works. Prefer an explicit override
+ * Finds a DRM render device. We try the environment variable first
  * ($ANLAND_DRM_DEVICE), then the first enumerated render node (as the virtual
  * backend does), then the standard render node — which on the kgsl/turnip stack
  * is the msm node exposed at /dev/dri/renderD128.
  */
-static std::unique_ptr<DrmDevice> openRenderDevice()
+static std::unique_ptr<RenderDevice> openRenderDevice()
 {
     const QString override = qEnvironmentVariable("ANLAND_DRM_DEVICE");
     if (!override.isEmpty()) {
-        if (auto dev = DrmDevice::open(override)) {
+        if (auto dev = RenderDevice::open(override)) {
             return dev;
         }
         qCWarning(KWIN_ANLAND) << "ANLAND_DRM_DEVICE" << override << "could not be opened";
@@ -70,7 +69,7 @@ static std::unique_ptr<DrmDevice> openRenderDevice()
             });
             for (drmDevice *device : std::as_const(devices)) {
                 if (device->available_nodes & (1 << DRM_NODE_RENDER)) {
-                    if (auto dev = DrmDevice::open(QString::fromUtf8(device->nodes[DRM_NODE_RENDER]))) {
+                    if (auto dev = RenderDevice::open(QString::fromUtf8(device->nodes[DRM_NODE_RENDER]))) {
                         return dev;
                     }
                 }
@@ -78,7 +77,7 @@ static std::unique_ptr<DrmDevice> openRenderDevice()
         }
     }
 
-    return DrmDevice::open(QStringLiteral("/dev/dri/renderD128"));
+    return RenderDevice::open(QStringLiteral("/dev/dri/renderD128"));
 }
 
 AnlandBackend::AnlandBackend(const QString &socketPath, QObject *parent)
@@ -104,8 +103,6 @@ AnlandBackend::~AnlandBackend()
         ::disconnect(m_display); // C producer API, not QObject::disconnect
         m_display = nullptr;
     }
-    // m_eglDisplay (EglDisplay) tears down the EGLDisplay in its destructor; the
-    // 5.27-era manual eglTerminate(sceneEglDisplay()) is no longer needed.
 }
 
 bool AnlandBackend::initialize()
@@ -129,8 +126,8 @@ bool AnlandBackend::initialize()
 
     // KWin dereferences renderBackend->drmDevice() during OpenGL compositor
     // setup; without a real device it segfaults. Open one up front.
-    m_drmDevice = openRenderDevice();
-    if (!m_drmDevice) {
+    m_renderDevice = openRenderDevice();
+    if (!m_renderDevice) {
         qCWarning(KWIN_ANLAND) << "no usable DRM render device; cannot bring up OpenGL compositing";
         return false;
     }
@@ -206,12 +203,17 @@ QList<BackendOutput *> AnlandBackend::outputs() const
 
 EglDisplay *AnlandBackend::sceneEglDisplayObject() const
 {
-    return m_eglDisplay.get();
+    return m_renderDevice ? m_renderDevice->eglDisplay() : nullptr;
 }
 
-void AnlandBackend::setEglDisplay(std::unique_ptr<EglDisplay> &&display)
+RenderDevice *AnlandBackend::renderDevice() const
 {
-    m_eglDisplay = std::move(display);
+    return m_renderDevice.get();
+}
+
+DrmDevice *AnlandBackend::drmDevice() const
+{
+    return m_renderDevice ? m_renderDevice->drmDevice() : nullptr;
 }
 
 bool AnlandBackend::notifyFramePresented()

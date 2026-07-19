@@ -36,6 +36,7 @@ class DrmDevice;
 class EglBackend;
 class EglDisplay;
 class InputBackend;
+class RenderDevice;
 
 class KWIN_EXPORT AnlandBackend : public OutputBackend
 {
@@ -53,16 +54,13 @@ public:
     QList<BackendOutput *> outputs() const override;
 
     EglDisplay *sceneEglDisplayObject() const override;
-    void setEglDisplay(std::unique_ptr<EglDisplay> &&display);
+    RenderDevice *renderDevice() const;
 
     display_ctx *display() const
     {
         return m_display;
     }
-    DrmDevice *drmDevice() const
-    {
-        return m_drmDevice.get();
-    }
+    DrmDevice *drmDevice() const;
     AnlandInputDevice *inputDevice() const
     {
         return m_inputDevice.get();
@@ -105,8 +103,7 @@ private:
     QString m_socketPath;
     display_ctx *m_display = nullptr;
 
-    std::unique_ptr<DrmDevice> m_drmDevice;
-    std::unique_ptr<EglDisplay> m_eglDisplay;
+    std::unique_ptr<RenderDevice> m_renderDevice;
     QVector<AnlandOutput *> m_outputs;
     std::unique_ptr<AnlandInputDevice> m_inputDevice;
 
