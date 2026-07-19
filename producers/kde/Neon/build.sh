@@ -51,6 +51,11 @@ die()  { printf '\033[1;31m[error] %s\033[0m\n' "$*" >&2; exit 1; }
 
 # ---- enable deb-src so `apt source` works ----------------------------------
 ensure_deb_src() {
+    # Purge conflicting theme packages first so that apt-get update/dist-upgrade does not crash
+    log "Purging conflicting packages from base Ubuntu image"
+    $SUDO apt-get purge -y breeze breeze-cursor-theme kwin-style-breeze kde-style-breeze >/dev/null 2>&1 || true
+    $SUDO apt-get autoremove -y >/dev/null 2>&1 || true
+
     # Ensure ca-certificates, gnupg and wget are installed first
     $SUDO apt-get update -qq
     $SUDO apt-get install -y --no-install-recommends ca-certificates gnupg wget >/dev/null 2>&1
@@ -105,12 +110,7 @@ build_pkg_deb() {
     mkdir -p "$WORKDIR/$src"
     cd "$WORKDIR/$src"
 
-    # Purge conflicting theme packages first so that apt-get build-dep does not hit unmet version dependency checks
-    if [ "$src" = "kwin" ]; then
-        log "Purging conflicting breeze packages to resolve build-dep conflicts"
-        $SUDO apt-get purge -y breeze breeze-cursor-theme kwin-style-breeze kde-style-breeze >/dev/null 2>&1 || true
-        $SUDO apt-get autoremove -y >/dev/null 2>&1 || true
-    fi
+
 
     # Install build-deps (pulls Qt6, KF6, etc.)
     log "Installing build dependencies for '${src}'"
