@@ -131,9 +131,9 @@ build_pkg_deb() {
     log "Applying patch: ${patch}"
     patch -p1 < "$patch" || die "Patch failed to apply cleanly. May need manual adjustment for this KWin version."
 
-    log "Building .deb packages (using ${JOBS} jobs)"
+    log "Building .deb packages (using ${JOBS} jobs with build-dep override)"
     DEB_BUILD_OPTIONS="nocheck parallel=${JOBS}" \
-        dpkg-buildpackage -b -us -uc -j"$JOBS" \
+        dpkg-buildpackage -b -us -uc -j"$JOBS" -d \
         || die "dpkg-buildpackage failed for '${src}'"
 
     log "Collecting .deb files"
