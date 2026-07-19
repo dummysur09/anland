@@ -51,31 +51,34 @@ die()  { printf '\033[1;31m[error] %s\033[0m\n' "$*" >&2; exit 1; }
 
 # ---- enable deb-src so `apt source` works ----------------------------------
 ensure_deb_src() {
-    # KDE neon uses /etc/apt/sources.list.d/neon.list (noble base)
-    if ! $SUDO grep -rqsE '^Types:.*deb-src|^deb-src ' \
-            /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null; then
-        log "Enabling deb-src repositories for KDE neon (noble base)"
-        # Modern Ubuntu-style .sources file
-        if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
-            $SUDO sed -i 's/^Types: deb$/Types: deb deb-src/' \
-                /etc/apt/sources.list.d/ubuntu.sources
-        fi
-        # KDE neon specific source list
-        if [ -f /etc/apt/sources.list.d/neon.list ]; then
-            local neon_src
-            neon_src="$(grep '^deb ' /etc/apt/sources.list.d/neon.list | \
-                         sed 's/^deb /deb-src /' | head -1)"
-            if [ -n "$neon_src" ]; then
-                echo "$neon_src" | $SUDO tee -a /etc/apt/sources.list.d/neon.list >/dev/null
-            fi
-        fi
-        # Legacy single-line format fallback
-        if [ -f /etc/apt/sources.list ]; then
-            $SUDO sed -i '/^deb /{ h; s/^deb /deb-src /; H; g }' \
-                /etc/apt/sources.list
-        fi
-        $SUDO apt-get update -qq
+    # Ensure ca-certificates, gnupg and wget are installed first
+    $SUDO apt-get update -qq
+    $SUDO apt-get install -y --no-install-recommends ca-certificates gnupg wget >/dev/null 2>&1
+
+    # Configure Neon repository if not present
+    if [ ! -f /etc/apt/sources.list.d/neon.list ]; then
+        log "Adding KDE Neon Noble repositories to APT sources"
+        # Download Neon GPG key
+        wget -qO- 'https://archive.neon.kde.org/public.key' | $SUDO gpg --dearmor -y -o /usr/share/keyrings/kde-neon-archive-keyring.gpg 2>/dev/null || \
+        wget -qO- 'https://archive.neon.kde.org/public.key' | $SUDO gpg --dearmor -o /usr/share/keyrings/kde-neon-archive-keyring.gpg
+        
+        # Write repository sources
+        echo "deb [signed-by=/usr/share/keyrings/kde-neon-archive-keyring.gpg] http://archive.neon.kde.org/user noble main" | $SUDO tee /etc/apt/sources.list.d/neon.list >/dev/null
+        echo "deb-src [signed-by=/usr/share/keyrings/kde-neon-archive-keyring.gpg] http://archive.neon.kde.org/user noble main" | $SUDO tee -a /etc/apt/sources.list.d/neon.list >/dev/null
+        
+        # Set APT preferences pinning for Neon
+        printf "Package: *\nPin: origin archive.neon.kde.org\nPin-Priority: 1100\n" | $SUDO tee /etc/apt/preferences.d/99-neon >/dev/null
     fi
+
+    # Enable deb-src for standard Ubuntu repositories as well
+    if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+        $SUDO sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+    fi
+    if [ -f /etc/apt/sources.list ]; then
+        $SUDO sed -i '/^deb /{ h; s/^deb /deb-src /; H; g }' /etc/apt/sources.list
+    fi
+
+    $SUDO apt-get update -qq
 }
 
 # ---- pin built packages so apt upgrade won't overwrite them ----------------
