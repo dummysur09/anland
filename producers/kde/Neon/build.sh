@@ -120,14 +120,14 @@ build_pkg_deb() {
         kf6-kdeclarative-dev kf6-kio-dev kf6-kwidgetsaddons-dev kf6-ksvg-dev \
         kf6-kcolorscheme-dev kf6-kcompletion-dev kf6-kconfigwidgets-dev kf6-kservice-dev \
         kf6-kxmlgui-dev kf6-kcmutils-dev kf6-knewstuff-dev kf6-krunner-dev \
-        libcap-dev libdrm-dev libgbm-dev libinput-dev libudev-dev libdisplay-info-dev \
+        kf6-kidletime-dev libdisplay-info-dev libseat-dev kscreenlocker-dev \
+        libcap-dev libdrm-dev libgbm-dev libinput-dev libudev-dev \
         libpipewire-0.3-dev libkpipewire-dev liblcms2-dev libepoxy-dev libei-dev libeis-dev \
         libx11-xcb-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-composite0-dev \
         libxcb-shape0-dev libxcb-xfixes0-dev libxcb-damage0-dev libxcb-sync-dev \
         libxcb-render0-dev libxcb-shm0-dev libxcb-glx0-dev libxcb-present-dev \
         libxcb-xinput-dev libxcb-xkb-dev libxkbcommon-dev libxkbcommon-x11-dev \
-        libxcb1-dev libx11-dev hwdata libdisplay-info-dev libseat-dev kscreenlocker-dev \
-        libqaccessibilityclient-qt6-dev || true
+        libxcb1-dev libx11-dev hwdata libqaccessibilityclient-qt6-dev || true
 
     # Download the source
     log "Downloading source code for '${src}'"
