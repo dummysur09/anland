@@ -107,6 +107,7 @@ build_pkg_deb() {
     log "Installing base build environment and kf6 build helpers"
     $SUDO apt-get install -y --no-install-recommends \
         cmake debhelper extra-cmake-modules pkg-config \
+        gcc-14 g++-14 \
         qt6-base-dev qt6-declarative-dev qt6-wayland-dev \
         libwayland-dev libdrm-dev libgbm-dev libinput-dev \
         libxkbcommon-dev libudev-dev libepoxy-dev || true
