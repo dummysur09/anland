@@ -78,7 +78,11 @@ ensure_deb_src() {
         $SUDO sed -i '/^deb /{ h; s/^deb /deb-src /; H; g }' /etc/apt/sources.list
     fi
 
+    # Run dist-upgrade to align versions and solve dependencies conflicts
+    log "Running dist-upgrade to align packaging versions"
     $SUDO apt-get update -qq
+    $SUDO apt-get dist-upgrade -y -o Dpkg::Options::="--force-overwrite" --allow-downgrades
+    $SUDO apt-get install -f -y
 }
 
 # ---- pin built packages so apt upgrade won't overwrite them ----------------
