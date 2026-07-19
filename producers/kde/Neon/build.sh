@@ -148,6 +148,13 @@ build_pkg_deb() {
     [ -d "$srcdir" ] || die "Could not find unpacked source directory for '${src}'"
     cd "$srcdir"
 
+    # Copy the custom backend source directory if building KWin
+    if [ "$src" = "kwin" ]; then
+        log "Copying custom backend source directory 'anland' to src/backends/"
+        mkdir -p src/backends/anland
+        cp -r "$SCRIPT_DIR/../anland_backend_v5/src/backends/anland/." src/backends/anland/
+    fi
+
     log "Applying patch: ${patch}"
     patch -p1 < "$patch" || die "Patch failed to apply cleanly. May need manual adjustment for this KWin version."
 
