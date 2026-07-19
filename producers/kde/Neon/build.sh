@@ -121,7 +121,7 @@ build_pkg_deb() {
         kf6-kcolorscheme-dev kf6-kcompletion-dev kf6-kconfigwidgets-dev kf6-kservice-dev \
         kf6-kxmlgui-dev kf6-kcmutils-dev kf6-knewstuff-dev kf6-krunner-dev \
         kf6-kidletime-dev libdisplay-info-dev libseat-dev kscreenlocker-dev libkdecorations3-dev \
-        libcap-dev libdrm-dev libgbm-dev libinput-dev libudev-dev \
+        libcap-dev libdrm-dev libgbm-dev libinput-dev libudev-dev libcanberra-dev \
         libpipewire-0.3-dev libkpipewire-dev liblcms2-dev libepoxy-dev libei-dev libeis-dev \
         libx11-xcb-dev libxcb-keysyms1-dev libxcb-randr0-dev libxcb-composite0-dev \
         libxcb-shape0-dev libxcb-xfixes0-dev libxcb-damage0-dev libxcb-sync-dev \
