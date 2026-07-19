@@ -112,7 +112,15 @@ build_pkg_deb() {
 
 
 
-    # Install build-deps (pulls Qt6, KF6, etc.)
+    # Install build tools, compilers, and extra-cmake-modules manually first to ensure kf6 addon is loaded
+    log "Installing base build environment and kf6 build helpers"
+    $SUDO apt-get install -y --no-install-recommends \
+        cmake debhelper extra-cmake-modules pkg-config \
+        qt6-base-dev qt6-declarative-dev qt6-wayland-dev \
+        libwayland-dev libdrm-dev libgbm-dev libinput-dev \
+        libxkbcommon-dev libudev-dev libepoxy-dev || true
+
+    # Install remaining build-deps (pulls Qt6, KF6, etc.)
     log "Installing build dependencies for '${src}'"
     $SUDO apt-get build-dep -y -o Debug::pkgProblemResolver=yes --no-install-recommends "$src" || \
     $SUDO apt-get build-dep -y "$src" || \
