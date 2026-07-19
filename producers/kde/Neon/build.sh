@@ -51,9 +51,11 @@ die()  { printf '\033[1;31m[error] %s\033[0m\n' "$*" >&2; exit 1; }
 
 # ---- enable deb-src so `apt source` works ----------------------------------
 ensure_deb_src() {
-    # Purge conflicting theme packages first so that apt-get update/dist-upgrade does not crash
-    log "Purging conflicting packages from base Ubuntu image"
-    $SUDO apt-get purge -y breeze breeze-cursor-theme kwin-style-breeze kde-style-breeze >/dev/null 2>&1 || true
+    # Forcefully purge conflicting theme packages using dpkg directly to bypass apt resolver conflicts
+    log "Purging conflicting packages from base Ubuntu image using dpkg"
+    for pkg in breeze breeze-cursor-theme kwin-style-breeze kde-style-breeze; do
+        $SUDO dpkg --purge --force-all "$pkg" >/dev/null 2>&1 || true
+    done
     $SUDO apt-get autoremove -y >/dev/null 2>&1 || true
 
     # Ensure ca-certificates, gnupg and wget are installed first
