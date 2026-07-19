@@ -35,7 +35,7 @@
      if (xwl_gbm->dmabuf_capable && modifier != DRM_FORMAT_MOD_INVALID) {
  #ifdef GBM_BO_WITH_MODIFIERS
          struct gbm_import_fd_modifier_data data;
-@@ -1665,27 +1683,37 @@
+@@ -1665,30 +1683,36 @@
  xwl_glamor_gbm_init_main_dev(struct xwl_screen *xwl_screen)
  {
      struct xwl_gbm_private *xwl_gbm = xwl_glamor_gbm_get_private(xwl_screen);
@@ -64,3 +64,19 @@
 -        return TRUE;
 +        return xwl_gbm->main_dev != NULL;
      }
+ 
+     if (fstat(main_dev_fd, &drm_stat) < 0) {
+         close(main_dev_fd);
+         return FALSE;
+     }
+ 
+     xwl_gbm->main_dev = gbm_create_device(main_dev_fd);
+     if (!xwl_gbm->main_dev) {
+         close(main_dev_fd);
+         return FALSE;
+     }
+ 
+     return TRUE;
+ }
+
+
